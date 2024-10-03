@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Box, Grid, Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
 import Column from './Column';
@@ -12,37 +12,44 @@ interface Ticket {
 }
 
 const socket = io('http://localhost:5000'); 
+
 const Board: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const ticketsRef = useRef<Ticket[]>([]); // Create a ref to keep track of tickets
   const [newTicket, setNewTicket] = useState({ title: '', description: '', status: 'To Do' });
   const [open, setOpen] = useState(false);
   const columns = ['To Do', 'In Progress', 'Done'];
 
+  // Update the ref whenever tickets change
   useEffect(() => {
-    // Fetch the tickets from the server
+    ticketsRef.current = tickets;
+  }, [tickets]);
+
+  function fetchTickets() {
     axios.get('/api/tickets').then((response) => {
       setTickets(response.data);
     });
+  }
 
+  useEffect(() => {
+    // Fetch the tickets from the server
+    fetchTickets();
+   
+    // Listen for real-time updates from the server via WebSocket
     socket.on('ticket_added', (ticket: Ticket) => {
-      setTickets((prevTickets) => [...prevTickets, ticket]); // Add the new ticket
+      setTickets((prevTickets) => [...prevTickets, ticket]);
     });
 
     socket.on('ticket_updated', (updatedTicket: Ticket) => {
       setTickets((prevTickets) =>
         prevTickets.map((ticket) => (ticket.id === updatedTicket.id ? updatedTicket : ticket))
-      ); // Update the ticket
+      );
     });
 
     socket.on('ticket_deleted', ({ id }: { id: number }) => {
-      console.log(`Ticket with ID ${id} deleted`);
-          const updatedTickets = [...tickets].filter((ticket) => ticket.id !== id);
-      setTickets(updatedTickets); 
+      fetchTickets();
     });
-    socket.on('connect_error', (err) => {
-      console.error('Connection error:', err);
-    });
-        
+
     // Clean up the WebSocket connection when the component unmounts
     return () => {
       socket.off('ticket_added');
@@ -60,10 +67,31 @@ const Board: React.FC = () => {
   };
 
   // Handle ticket edit (moving between columns)
-  const handleMoveTicket = (id: number, newStatus: string) => {
-    axios.put(`/api/tickets/${id}`, { status: newStatus }).then(() => {});
+  const handleMoveTicket = (id: number, direction: 'forward' | 'backward') => {
+    const currentTicket = tickets.find((ticket) => ticket.id === id);
+    if (!currentTicket) return;
+  
+    const { status } = currentTicket;
+  
+    const nextStatus = (status: string) => {
+      if (status === 'To Do' && direction === 'forward') return 'In Progress';
+      if (status === 'In Progress' && direction === 'forward') return 'Done';
+      if (status === 'In Progress' && direction === 'backward') return 'To Do';
+      if (status === 'Done' && direction === 'backward') return 'In Progress';
+      return status; 
+    };
+  
+    const newStatus = nextStatus(status);
+  
+    if (newStatus !== status) {
+      axios.put(`/api/tickets/${id}`, { status: newStatus }).then(() => {
+        // Update ticket state locally (it will also be synced with WebSocket)
+        setTickets((prevTickets) =>
+          prevTickets.map((ticket) => (ticket.id === id ? { ...ticket, status: newStatus } : ticket))
+        );
+      });
+    }
   };
-
   // Handle removing a ticket
   const handleRemoveTicket = (id: number) => {
     axios.delete(`/api/tickets/${id}`).then(() => {});
@@ -107,7 +135,6 @@ const Board: React.FC = () => {
             onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
           />
           
-          {/* Select status for the ticket */}
           <FormControl fullWidth margin="dense">
             <InputLabel>Status</InputLabel>
             <Select

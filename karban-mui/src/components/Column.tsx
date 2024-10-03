@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, Typography, Button } from '@mui/material';
+import { Card, CardContent, Typography, Button, Box } from '@mui/material';
 import Ticket from './Ticket';
 
 interface TicketProps {
@@ -12,17 +12,11 @@ interface TicketProps {
 interface ColumnProps {
   title: string;
   tickets: TicketProps[];
-  onMoveTicket: (id: number, newStatus: string) => void;
+  onMoveTicket: (id: number, direction: 'forward' | 'backward') => void;
   onRemoveTicket: (id: number) => void;
 }
 
 const Column: React.FC<ColumnProps> = ({ title, tickets, onMoveTicket, onRemoveTicket }) => {
-  const nextStatus = (status: string) => {
-    if (status === 'To Do') return 'In Progress';
-    if (status === 'In Progress') return 'Done';
-    return '';
-  };
-
   return (
     <Card variant="outlined">
       <CardContent>
@@ -32,25 +26,42 @@ const Column: React.FC<ColumnProps> = ({ title, tickets, onMoveTicket, onRemoveT
         {tickets.map((ticket) => (
           <div key={ticket.id}>
             <Ticket key={ticket.id} {...ticket} />
-            <Button
-              onClick={() => onRemoveTicket(ticket.id)}
-              variant="contained"
-              color="secondary"
-              size="small"
-              sx={{ marginRight: 1 }}
-            >
-              Delete
-            </Button>
-            {nextStatus(ticket.status) && (
+            
+            {/* Buttons to move tickets forward and backward */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
+              {ticket.status !== 'To Do' && (
+                <Button
+                  onClick={() => onMoveTicket(ticket.id, 'backward')}
+                  variant="contained"
+                  color="secondary"
+                  size="small"
+                  sx={{ marginRight: 1 }}
+                >
+                  Return Ticket
+                </Button>
+              )}
+
+           
               <Button
-                onClick={() => onMoveTicket(ticket.id, nextStatus(ticket.status))}
+                onClick={() => onRemoveTicket(ticket.id)}
                 variant="contained"
-                color="primary"
+                color="error"
                 size="small"
               >
-                Move to {nextStatus(ticket.status)}
+                Delete
               </Button>
-            )}
+
+              {ticket.status !== 'Done' && (
+                <Button
+                  onClick={() => onMoveTicket(ticket.id, 'forward')}
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                >
+                  Progress Ticket
+                </Button>
+              )}
+            </Box>
           </div>
         ))}
       </CardContent>

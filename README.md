@@ -8,12 +8,12 @@
 git clone https://github.com/AhmadIbrahiim/Website-downloader.git
 
 // for client
-$ cd kanban-mui
+$ cd karban-mui
 $ npm install
 $ npm start
 http://localhost:3000/
 
 // also start the server
-$ cd kanban-backend 
+$ cd karban-backend 
 $ npm install
 $ npm run dev
